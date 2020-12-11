@@ -4,10 +4,9 @@
 #include "./constants.h"
 
 int game_is_running = false;
+int last_frame_time = 0;
 SDL_Window* window = NULL;
 SDL_Renderer* renderer = NULL;
-
-int last_frame_time = 0;
 
 struct game_object {
   float x;
@@ -37,9 +36,8 @@ int initialize_window(void) {
     SDL_WINDOWPOS_CENTERED,
     WINDOW_WIDTH,
     WINDOW_HEIGHT,
-    0
+    SDL_WINDOW_BORDERLESS
   );
-
   if (!window) {
     fprintf(stderr, "Error creating SDL Window.\n");
     return false;
@@ -50,41 +48,35 @@ int initialize_window(void) {
     fprintf(stderr, "Error creating SDL Renderer.\n");
     return false;
   }
-
   return true;
 }
 
-void process_input() {
+void process_input(void) {
     SDL_Event event;
     SDL_PollEvent(&event);
 
     switch (event.type) {
       case SDL_QUIT:
-      game_is_running = false;
-      break;
-      case SDL_KEYDOWN:
-      if (event.key.keysym.sym == SDLK_ESCAPE) {
         game_is_running = false;
-      }
-      if (event.key.keysym.sym == SDLK_LEFT) {
-        paddle.vel_x = -400;
-      }
-      if (event.key.keysym.sym == SDLK_RIGHT) {
-        paddle.vel_x = 400;
-      }
-      break;
+        break;
+      case SDL_KEYDOWN:
+        if (event.key.keysym.sym == SDLK_ESCAPE)
+          game_is_running = false;
+        if (event.key.keysym.sym == SDLK_LEFT)
+          paddle.vel_x = -400;
+        if (event.key.keysym.sym == SDLK_RIGHT)
+          paddle.vel_x = 400;
+        break;
       case SDL_KEYUP:
-      if (event.key.keysym.sym == SDLK_LEFT) {
-        paddle.vel_x = 0;
-      }
-      if (event.key.keysym.sym == SDLK_RIGHT) {
-        paddle.vel_x = 0;
-      }
-      break;
+        if (event.key.keysym.sym == SDLK_LEFT)
+          paddle.vel_x = 0;
+        if (event.key.keysym.sym == SDLK_RIGHT)
+          paddle.vel_x = 0;
+        break;
     }
 }
 
-void setup() {
+void setup(void) {
   ball.x = WINDOW_WIDTH / 2;
   ball.y = 20;
   ball.width = 15;
@@ -106,12 +98,12 @@ void update(void) {
   int time_to_wait = FRAME_TARGET_TIME - (SDL_GetTicks() - last_frame_time);
 
   // Only enforce this rule if needed
-  if (time_to_wait > 0 && time_to_wait < FRAME_TARGET_TIME) {
+  if (time_to_wait > 0 && time_to_wait <= FRAME_TARGET_TIME) {
     SDL_Delay(time_to_wait);
   }
 
   // Get the difference in seconds between the current and previous frames
-  float delta_time = (SDL_GetTicks() - last_frame_time) / 1000.0f;
+  float delta_time = (SDL_GetTicks() - last_frame_time) / 1000.0;
 
   last_frame_time = SDL_GetTicks();
 
@@ -133,30 +125,28 @@ void update(void) {
   // TODO: check for ball collision with the paddle
   if
   (
-    ball.x > paddle.x &&
-    ball.x < paddle.x + paddle.width &&
-    ball.y + ball.height > paddle.y
+    ball.y + ball.height >= paddle.y &&
+    ball.x + ball.width >= paddle.x &&
+    ball.x <= paddle.x + paddle.width
   )
   {
-    ball.vel_y *= -1;
-    ball.y = paddle.y - ball.height;
+    ball.vel_y = -ball.vel_y;
   }
 
   // TODO: prevent paddle from moving outside from boundaries of the window
-  if (paddle.x <= 0) {
-    paddle.x = 0;
-  } else if (paddle.x + paddle.width >= WINDOW_WIDTH) {
-    paddle.x = WINDOW_WIDTH - paddle.width;
-  }
+  if (paddle.x <= 0)
+      paddle.x = 0;
+  if (paddle.x >= WINDOW_WIDTH - paddle.width)
+      paddle.x = WINDOW_WIDTH - paddle.width;
 
-  // TODO: check for game over when ball hits the bottom part of the screen
-  if (ball.y + ball.height >= WINDOW_HEIGHT) {
-    fprintf(stderr, "lost!");
-    game_is_running = false;
+  // Check for game over
+  if (ball.y + ball.height > WINDOW_HEIGHT) {
+      ball.x = WINDOW_WIDTH / 2;
+      ball.y = 0;
   }
 }
 
-void render() {
+void render(void) {
   SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
   SDL_RenderClear(renderer);
 
@@ -186,14 +176,14 @@ void render() {
   SDL_RenderPresent(renderer);
 }
 
-void destroy_window() {
+void destroy_window(void) {
   // Clean up variables used by SDL, in reverse order they weree declared
   SDL_DestroyRenderer(renderer);
   SDL_DestroyWindow(window);
   SDL_Quit();
 }
 
-int main() {
+int main(void) {
   game_is_running = initialize_window();
 
   setup();
